@@ -13,7 +13,6 @@ permissions:
 
 jobs:
   sync-upstream:
-    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     outputs:
       updated: ${{ steps.sync.outputs.updated }}
@@ -30,6 +29,11 @@ jobs:
       - name: Sync From Upstream
         id: sync
         run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           git remote add upstream https://github.com/monyxie/qr-lite.git
           git fetch upstream master
 
