@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       updated: ${{ steps.sync.outputs.updated }}
+      release_tag: ${{ steps.sync.outputs.release_tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,29 +30,46 @@ jobs:
       - name: Sync From Upstream
         id: sync
         run: |
+          echo "release_tag=" >> "$GITHUB_OUTPUT"
+
           if [ "${{ github.event_name }}" = "push" ]; then
             echo "updated=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           git remote add upstream https://github.com/monyxie/qr-lite.git
-          git fetch upstream master
+          git fetch upstream master --tags
 
           LOCAL_SHA="$(git rev-parse HEAD)"
           UPSTREAM_SHA="$(git rev-parse upstream/master)"
+          UPDATED=false
 
-          if [ "$LOCAL_SHA" = "$UPSTREAM_SHA" ]; then
-            echo "updated=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          if [ "$LOCAL_SHA" != "$UPSTREAM_SHA" ]; then
+            git merge --no-edit upstream/master
+            git push origin HEAD:master
+            UPDATED=true
           fi
 
-          git merge --no-edit upstream/master
-          git push origin HEAD:master
-          echo "updated=true" >> "$GITHUB_OUTPUT"
+          LATEST_UPSTREAM_TAG="$(
+            git tag -l 'v*' \
+              | grep -E '^v[0-9]+(\.[0-9]+)*$' \
+              | sort -V \
+              | tail -n1
+          )"
+          if [ -n "$LATEST_UPSTREAM_TAG" ]; then
+            FORK_TAG="${LATEST_UPSTREAM_TAG}-fork.1"
+            if ! git ls-remote --exit-code --tags origin "refs/tags/$FORK_TAG" >/dev/null 2>&1; then
+              git tag "$FORK_TAG"
+              git push origin "refs/tags/$FORK_TAG"
+              echo "release_tag=$FORK_TAG" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+          echo "updated=$UPDATED" >> "$GITHUB_OUTPUT"
 
   build-chrome:
     needs: sync-upstream
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.sync-upstream.outputs.updated == 'true'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.sync-upstream.outputs.updated == 'true' || needs.sync-upstream.outputs.release_tag != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
