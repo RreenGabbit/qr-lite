@@ -1,0 +1,77 @@
+name: Sync Upstream And Build Chrome
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+  schedule:
+    - cron: "23 */6 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  sync-upstream:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      updated: ${{ steps.sync.outputs.updated }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync From Upstream
+        id: sync
+        run: |
+          git remote add upstream https://github.com/monyxie/qr-lite.git
+          git fetch upstream master
+
+          LOCAL_SHA="$(git rev-parse HEAD)"
+          UPSTREAM_SHA="$(git rev-parse upstream/master)"
+
+          if [ "$LOCAL_SHA" = "$UPSTREAM_SHA" ]; then
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git merge --no-edit upstream/master
+          git push origin HEAD:master
+          echo "updated=true" >> "$GITHUB_OUTPUT"
+
+  build-chrome:
+    needs: sync-upstream
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || needs.sync-upstream.outputs.updated == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: yarn
+
+      - name: Install Dependencies
+        run: corepack yarn install --frozen-lockfile
+
+      - name: Build Chrome Extension
+        run: corepack yarn run webpack --mode production --env browser=chrome
+
+      - name: Package Chrome Build
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          cd dist/chrome
+          zip -r "../../qr-lite-chrome-${SHORT_SHA}.zip" .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qr-lite-chrome-${{ github.sha }}
+          path: qr-lite-chrome-*.zip

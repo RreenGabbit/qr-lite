@@ -106,7 +106,7 @@ const imageRetriever = (options, debug) => {
         };
       } catch (e) {
         console.error(e);
-        canCapture === false;
+        canCapture = false;
       }
 
       if (canCapture && scroll && rect) {
@@ -181,7 +181,7 @@ const imageRetriever = (options, debug) => {
       if (!dataUri && !captureParams && options.url) {
         const isSameOrigin =
           window.location.origin === new URL(options.url).origin;
-        const isLoadedViaCors = originalImg.crossOrigin !== null;
+        const isLoadedViaCors = originalImg?.crossOrigin !== null;
 
         if (!originalImg || (!isSameOrigin && !isLoadedViaCors)) {
           const newImg = new Image();
@@ -503,4 +503,3 @@ ImageScanner.propTypes = {
   frameId: PropTypes.any,
   targetElementId: PropTypes.any,
 };
-

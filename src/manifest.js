@@ -24,12 +24,16 @@ const manifest = {
         48: "icons/qrlite-48.png",
         128: "icons/qrlite-128.png",
       },
-  browser_specific_settings: {
-    gecko: {
-      id: "@qrlite",
-      strict_min_version: "126.0",
-    },
-  },
+  ...(browser === "firefox"
+    ? {
+        browser_specific_settings: {
+          gecko: {
+            id: "@qrlite",
+            strict_min_version: "126.0",
+          },
+        },
+      }
+    : {}),
   permissions: [
     "activeTab",
     // MDN states that "contextMenus"  is an alias for "menus"

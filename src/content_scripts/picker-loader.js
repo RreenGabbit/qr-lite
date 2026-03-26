@@ -1,5 +1,6 @@
 import { apiNs } from "../utils/compat";
 import { randomStr } from "../utils/misc";
+import { debouncer } from "../utils/misc";
 
 class PickerLoader {
   constructor() {
@@ -9,16 +10,19 @@ class PickerLoader {
      * @var {WeakRef<HTMLMediaElement>[]}
      */
     this.pausedMedia = [];
+    this.scrollDebouncer = debouncer(50);
     this.handleScroll = () => {
-      if (this.pickerPort) {
-        this.pickerPort.postMessage({
-          action: "PICKER_UPDATE_SCROLL",
-          scroll: {
-            left: document.documentElement.scrollLeft,
-            top: document.documentElement.scrollTop,
-          },
-        });
-      }
+      this.scrollDebouncer.debounce(() => {
+        if (this.pickerPort) {
+          this.pickerPort.postMessage({
+            action: "PICKER_UPDATE_SCROLL",
+            scroll: {
+              left: document.documentElement.scrollLeft,
+              top: document.documentElement.scrollTop,
+            },
+          });
+        }
+      });
     };
   }
 
@@ -137,7 +141,9 @@ z-index: 2147483647
       // focus on the iframe otherwise the user won't be able to press <esc> to close the picker until they
       // manually focus on the iframe by clicking in it first
       iframe.contentWindow.focus();
-      document.addEventListener("scrollend", this.handleScroll);
+      document.addEventListener("scroll", this.handleScroll, {
+        passive: true,
+      });
     });
     iframe.contentWindow.location = url;
   }
@@ -151,7 +157,8 @@ z-index: 2147483647
       v.play();
     });
     this.pausedMedia = [];
-    document.removeEventListener("scrollend", this.handleScroll);
+    document.removeEventListener("scroll", this.handleScroll);
+    this.scrollDebouncer.cancel();
     document.querySelector(`iframe[${this.identifier}]`)?.remove();
     this.applyCss(true);
     if (this.pickerPort) {
