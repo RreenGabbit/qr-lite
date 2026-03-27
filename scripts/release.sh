@@ -18,6 +18,60 @@ case "$BROWSER" in
     ;;
 esac
 
+zip_paths() {
+  local output="$1"
+  shift
+
+  if command -v zip >/dev/null 2>&1; then
+    zip -r -9 "$output" "$@"
+    return
+  fi
+
+  python3 - "$output" "$@" <<'PY'
+import os
+import sys
+import zipfile
+
+output = sys.argv[1]
+inputs = sys.argv[2:]
+
+with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+    for base in inputs:
+        if not os.path.exists(base):
+            continue
+        if os.path.isdir(base):
+            for root, _, files in os.walk(base):
+                for name in files:
+                    path = os.path.join(root, name)
+                    zf.write(path, path)
+        else:
+            zf.write(base, base)
+PY
+}
+
+zip_stdin_paths() {
+  local output="$1"
+
+  if command -v zip >/dev/null 2>&1; then
+    zip -9 "$output" --exclude 'promo/*' -@
+    return
+  fi
+
+  python3 - "$output" <<'PY'
+import os
+import sys
+import zipfile
+
+output = sys.argv[1]
+paths = [line.rstrip("\n") for line in sys.stdin if line.strip() and not line.startswith("promo/")]
+
+with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+    for path in paths:
+        if os.path.exists(path):
+          zf.write(path, path)
+PY
+}
+
 pushd "$(dirname `dirname "$0"`)" || exit
 
 if output=$(git status --porcelain) && [ -z "$output" ]; then
@@ -62,8 +116,8 @@ if [ $? -eq 0 ]; then
   fi
 
   cd "$DIST_DIR" || exit
-  zip -r -9 "$RELEASE_FILE" ./*
+  zip_paths "$RELEASE_FILE" ./*
 
   cd "$PROJECT_ROOT" || exit
-  git ls-tree --name-only -r HEAD | zip -9 "$SOURCE_FILE" --exclude 'promo/*' -@
+  git ls-tree --name-only -r HEAD | zip_stdin_paths "$SOURCE_FILE"
 fi
