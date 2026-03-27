@@ -47,7 +47,7 @@ fi
 RELEASE_FILE="$RELEASE_DIR/qr-lite-$TAG-$BROWSER-release.zip"
 SOURCE_FILE="$RELEASE_DIR/qr-lite-$TAG-$BROWSER-source.zip"
 
-yarn install && yarn run eslint src && yarn run webpack --mode production --env browser="$BROWSER"
+corepack yarn install && corepack yarn run eslint src && corepack yarn run webpack --mode production --env browser="$BROWSER"
 
 if [ $? -eq 0 ]; then
 
