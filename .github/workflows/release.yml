@@ -20,6 +20,11 @@ jobs:
       - run: corepack yarn install --frozen-lockfile
       - run: scripts/release.sh firefox
       - run: scripts/release.sh chrome
+      - name: Prepare Friendly Release Files
+        run: |
+          mkdir -p release/friendly
+          cp release/qr-lite-*-chrome-release.zip release/friendly/qr-lite-chrome.zip
+          cp release/qr-lite-*-firefox-release.zip release/friendly/qr-lite-firefox.zip
       - uses: actions/upload-artifact@v4
         with:
           name: firefox-release
@@ -42,17 +47,41 @@ jobs:
           fi
           shopt -u nocasematch
 
+          cat > release-notes.txt <<EOF
+          Download the file that matches your browser:
+
+          - Brave / Chrome / Edge: \`qr-lite-chrome.zip\`
+          - Firefox: \`qr-lite-firefox.zip\`
+
+          Install in Brave / Chrome / Edge:
+
+          1. Download \`qr-lite-chrome.zip\`
+          2. Extract the ZIP to a folder
+          3. Open \`brave://extensions\` or \`chrome://extensions\`
+          4. Enable Developer mode
+          5. Click Load unpacked
+          6. Select the extracted folder
+
+          The other ZIP files are the original build and source archives.
+          EOF
+
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release for $TAG already exists; uploading assets instead."
             gh release upload "$TAG" \
               --clobber \
+              release/friendly/qr-lite-chrome.zip \
+              release/friendly/qr-lite-firefox.zip \
               release/qr-lite-*-firefox-*.zip \
               release/qr-lite-*-chrome-*.zip
+            gh release edit "$TAG" --notes-file release-notes.txt
           else
             gh release create "$TAG" \
               --title "$TAG" \
               --draft=false \
               --prerelease="$PRERELEASE" \
+              --notes-file release-notes.txt \
+              release/friendly/qr-lite-chrome.zip \
+              release/friendly/qr-lite-firefox.zip \
               release/qr-lite-*-firefox-*.zip \
               release/qr-lite-*-chrome-*.zip
           fi
